@@ -1,6 +1,6 @@
 import torch
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FuncAnimation, FFMpegWriter
 from IPython.display import HTML
 
 
@@ -100,7 +100,10 @@ class FlowModelPipeline:
     @torch.inference_mode()
     def generate_animation(self, x_s, n_steps=100, figsize=(5, 5), 
                           xlim=(-6, 6), ylim=(-6, 6), interval=50, 
-                          alpha=0.3, s=5, title="Flow Sampling"):
+                          alpha=0.3, s=5, title="Flow Sampling",
+                          dataset_from=None, dataset_to=None,
+                          source_color='blue', target_color='red',
+                          save_path=None):
         """
         Generate an animation of the flow sampling process (for 2D data).
         
@@ -114,6 +117,8 @@ class FlowModelPipeline:
             alpha: Scatter plot alpha value
             s: Scatter plot point size
             title: Animation title
+            dataset_from: Optional dataset for source samples
+            dataset_to: Optional dataset for target samples
             
         Returns:
             HTML animation object for display in Jupyter notebooks
@@ -125,7 +130,15 @@ class FlowModelPipeline:
         dt = 1.0 / n_steps
         t_vals = torch.linspace(0, 1, steps=n_steps, device=self.device)
         
-        fig, ax = plt.subplots(figsize=figsize)
+        fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+
+        if dataset_from is not None:
+            ax.scatter(dataset_from[:, 0].cpu().numpy(), dataset_from[:, 1].cpu().numpy(), 
+                       s=s-2, alpha=0.2, label='Source', color=source_color)
+        if dataset_to is not None:
+            ax.scatter(dataset_to[:, 0].cpu().numpy(), dataset_to[:, 1].cpu().numpy(), 
+                       s=s-2, alpha=0.2, label='Target', color=target_color)
+        
         scat = ax.scatter(x[:, 0].cpu().numpy(), x[:, 1].cpu().numpy(), 
                          s=s, alpha=alpha)
         
@@ -133,7 +146,7 @@ class FlowModelPipeline:
         ax.set_ylim(ylim)
         ax.set_title(title)
         ax.set_aspect('equal')
-        ax.grid(True, alpha=0.3)
+        ax.grid(True, alpha=0.5)
         
         def update(frame):
             nonlocal x
@@ -147,10 +160,22 @@ class FlowModelPipeline:
             return scat,
         
         ani = FuncAnimation(fig, update, frames=n_steps, 
-                          interval=interval, blit=True)
+                          interval=interval, blit=False)
         
         plt.close(fig)
-        return HTML(ani.to_jshtml())
+
+        if save_path is not None:
+            if save_path.endswith(".gif"):
+                ani.save(save_path, writer="pillow", fps=1000 // interval)
+                return HTML(f'<img src="{save_path}" alt="Flow Animation">')
+            elif save_path.endswith(".mp4"):
+                writer = FFMpegWriter(fps=1000 // interval, bitrate=1800)
+                ani.save(save_path, writer=writer)
+                return HTML(f'<video controls><source src="{save_path}" type="video/mp4"></video>')
+            else:
+                raise ValueError("Unsupported file format. Use .gif or .mp4")
+        else:
+            return HTML(ani.to_jshtml())
     
     @torch.inference_mode()
     def visualize_trajectory(self, x_s, n_steps=100, figsize=(5, 5),

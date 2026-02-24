@@ -5,37 +5,6 @@ from .pipeline import FlowModelPipeline
 from ..modules.simple_flow import FlowModelBase
 import ot
 
-def sample_from_ot_coupling(x_s, x_t, num_samples=None):
-    """
-    Sample (x_s, x_t) pairs according to OT coupling plan.
-
-    Args:
-        x_s: (n, d) torch tensor
-        x_t: (m, d) torch tensor
-        num_samples: number of sampled pairs (default = n)
-
-    Returns:
-        x_s_sampled, x_t_sampled
-    """
-    sol = ot.solve_sample(x_s, x_t)
-    P = sol.plan
-
-    n, m = P.shape
-    if num_samples is None:
-        num_samples = n
-
-    # flatten joint distribution
-    P_flat = P.reshape(-1)
-
-    # sample indices from joint
-    idx = torch.multinomial(P_flat, num_samples, replacement=True)
-
-    # recover (i, j)
-    i = idx // m
-    j = idx % m
-
-    return x_s[i], x_t[j]
-
 class Trainer:
     """Trainer class for flow matching models."""
     
@@ -63,7 +32,7 @@ class Trainer:
         self.dataloader = dataloader
         self.n_epochs = n_epochs
         self.sigma = sigma
-        self.sample_from_coupling = sample_from_coupling if sample_from_coupling else lambda x_s, x_t: (x_s, x_t)
+        self.sample_from_coupling = sample_from_coupling
         
         # Initialize optimizer
         self.optimizer = optimizer
@@ -75,6 +44,11 @@ class Trainer:
         Returns:
             The trained flow model
         """
+        if from_random_gaussian:
+            print("Training with random Gaussian noise as source samples.")
+        else:
+            print("Training with source samples from the dataset.")
+            
         pbar = tqdm(range(self.n_epochs))
         device = next(self.flow_model.parameters()).device
         for epoch in pbar:
@@ -86,8 +60,10 @@ class Trainer:
                 else:
                     x_s = batch[0].to(device)
                     x_t = batch[1].to(device)
-                    
-                x_s, x_t = self.sample_from_coupling(x_s, x_t)
+                
+                if self.sample_from_coupling is not None:
+                    x_s, x_t = self.sample_from_coupling(x_s, x_t)
+
                 batch_size_curr = x_s.size(0)
                 x_s = x_s.to(device)
                 x_t = x_t.to(device)
