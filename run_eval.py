@@ -78,8 +78,8 @@ def train_one_run(
     run_name: str,
 ):
     set_seed(seed)
-
-    if dataset == "moons-6gaussians":
+    os.makedirs("./run/checkpoints", exist_ok=True)
+    if dataset == "moons.6gaussians":
         x_source = sample_toy("moons", n_samples=100000, noise=0.05)
         x_target = sample_toy("6gaussians", n_samples=100000, noise=0.1)
         x_s_name, x_t_name = "moons", "6gaussians"
@@ -88,7 +88,7 @@ def train_one_run(
         x_source[:, 0] -= 3
         x_target = sample_toy("gaussians", n_samples=100000, noise=0.1)
         x_s_name, x_t_name = "gaussians", "gaussians"
-    elif dataset == "moons-circles":
+    elif dataset == "moons.circles":
         x_source = sample_toy("moons", n_samples=100000, noise=0.05)
         x_target = sample_toy("circles", n_samples=100000, noise=0.1)
         x_s_name, x_t_name = "moons", "circles"
@@ -110,11 +110,10 @@ def train_one_run(
         callbacks=[partial(eval_callback, run_name, x_s_name, x_t_name, csv_path)])
 
     trainer.train()
-    os.makedirs("./run/checkpoints", exist_ok=True)
     torch.save(flow_model.state_dict(), ckpt_path)
 
 if __name__ == "__main__":
-    DATASET = ["moons-6gaussians"]
+    DATASET = ["moons.6gaussians"]
     METHODS = [
         "independent_cfm",
         "ot_cfm",
