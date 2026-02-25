@@ -179,8 +179,10 @@ class Trainer:
         path_cfg: PathConfig,
         n_epochs: int = 100,
         grad_clip_norm: Optional[float] = None,
-        save_path: Optional[int] = None,
-        save_period: int = 1
+        save_path: Optional[str] = None,
+        save_period: int = 1,
+        eval_every: int = 5,
+        callbacks: Optional[list] = None,   # NEW
     ):
         self.flow_model = flow_model
         self.dataloader = dataloader
@@ -189,7 +191,9 @@ class Trainer:
         self.n_epochs = n_epochs
         self.grad_clip_norm = grad_clip_norm
         self.save_period = save_period
+        self.eval_every = eval_every
         self.save_path = save_path
+        self.callbacks = callbacks or []
 
     def _unpack(self, batch: Any, device: torch.device) -> Tuple[Optional[Tensor], Tensor]:
         if isinstance(batch, (tuple, list)):
@@ -206,12 +210,13 @@ class Trainer:
 
         for epoch in pbar:
             total_loss, total_n = 0.0, 0
+            
+            self.flow_model.train()
 
             if hasattr(self.dataloader.dataset, "reshuffle"):
                 self.dataloader.dataset.reshuffle()
 
             for batch in self.dataloader:
-
                 # Get (x0, x1) from batch; x0 may be None for flow_matching
                 x0, x1 = self._unpack(batch, device=device)
 
@@ -237,13 +242,16 @@ class Trainer:
                     torch.nn.utils.clip_grad_norm_(self.flow_model.parameters(), self.grad_clip_norm)
                 
                 self.optimizer.step()
-
                 total_loss += float(loss.item()) * B
                 total_n += B
 
-            avg = total_loss / max(total_n, 1)
-            pbar.set_description(f"Epoch [{epoch+1}/{self.n_epochs}] Path={self.path.cfg.name} Loss={avg:.6f}")
+            avg_loss = total_loss / max(total_n, 1)
+            pbar.set_description(f"Epoch [{epoch+1}/{self.n_epochs}] Path={self.path.cfg.name} Loss={avg_loss:.6f}")
 
+            if epoch % self.eval_every == 0:
+                for cb in self.callbacks:
+                    cb(self.flow_model, epoch)
+                
             if epoch % self.save_period == 0:
                 torch.save(self.flow_model.state_dict(), self.save_path)
 

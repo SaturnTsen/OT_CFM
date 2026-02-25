@@ -1,5 +1,6 @@
 import ot
 import torch
+from typing import Tuple
 
 def compute_w2_squared(x_s: torch.Tensor, x_t: torch.Tensor) -> float:
     n = x_s.size(0)
@@ -8,10 +9,9 @@ def compute_w2_squared(x_s: torch.Tensor, x_t: torch.Tensor) -> float:
     b = torch.full((m,), 1.0 / m, device=x_t.device)
     M = ot.dist(x_s, x_t, metric='euclidean') ** 2
     W2_squared = ot.emd2(a, b, M)
-    W2 = torch.sqrt(W2_squared)
-    return W2.item()
+    return W2_squared.item()
 
-def compute_path_energy(model: torch.nn.Module, x0: torch.Tensor, n_steps: int = 200) -> float:
+def compute_path_energy(model: torch.nn.Module, x0: torch.Tensor, n_steps: int = 200) -> Tuple[float, torch.Tensor]
     device = next(model.parameters()).device
     x = x0.to(device)
     dt = 1.0 / n_steps
@@ -23,9 +23,12 @@ def compute_path_energy(model: torch.nn.Module, x0: torch.Tensor, n_steps: int =
             v = model(t_batch, x)
             energy += (v.pow(2).sum(dim=1).mean()) * dt
             x = x + v * dt
-    return energy
+    return energy, x
 
-def normalized_path_energy(model: torch.nn.Module, x0: torch.Tensor, n_steps: int = 200) -> float:
-    energy = compute_path_energy(model, x0, n_steps)
-    w2_squared = compute_w2_squared(x0, model(1.0 * torch.ones(x0.size(0), 1, device=x0.device), x0))
-    return (energy - w2_squared) / w2_squared
+def compute_w2_npe(model: torch.nn.Module, x0: torch.Tensor, x1: torch.Tensor, n_steps: int = 200) -> Tuple[float, float]:
+    energy, x_out = compute_path_energy(model, x0, n_steps)
+    energy = float(energy)
+    w2_sq = compute_w2_squared(x0, x1)
+    npe = (energy - w2_sq) / w2_sq
+    w2_sq_xt_xout = compute_w2_squared(x_out, x1)
+    return w2_sq_xt_xout, npe
