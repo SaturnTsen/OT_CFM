@@ -19,30 +19,11 @@ import torch
 import ot
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
-from sklearn.datasets import make_circles, make_classification, make_moons
-from .couplings import *
+from ..datasets.couplings import *
 
-from .trainer import Trainer, sample_from_ot_coupling
+from ..modules.trainer import Trainer, sample_from_ot_coupling
 from ..modules.simple_flow import SimpleFlowModel
 
-def sample_toy(dataset_type, n_samples=1000, noise=0.1):
-    if dataset_type == 'moons':
-        X, _ = make_moons(n_samples=n_samples, noise=noise)
-    elif dataset_type == 'circles':
-        X, _ = make_circles(n_samples=n_samples, noise=noise, factor=0.5)
-        # normalize
-        X = (X - X.mean(axis=0)) / X.std(axis=0)
-    elif dataset_type == 'classification':
-        X, _ = make_classification(n_samples=n_samples, n_features=2, n_informative=2,
-                                   n_redundant=0, n_clusters_per_class=1)
-    elif dataset_type == '5gaussians':
-        centers = [[math.cos(2 * math.pi * i / 5), math.sin(2 * math.pi * i / 5)] for i in range(5)]
-        X, _ = make_classification(n_samples=n_samples, n_features=2, n_informative=2,
-                                   n_redundant=0, n_clusters_per_class=1, n_classes=5,
-                                   class_sep=2.0, centers=centers)
-    else:
-        raise ValueError("Unknown dataset type")
-    return X
     
 COUPLING_DICT = {
     'fm': independent_coupling,
@@ -81,7 +62,7 @@ def train_baseline(
     model = SimpleFlowModel(input_dim=2, time_dim=kwargs.get('time_dim', 8), hidden_dim=kwargs.get('hidden', 32)).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=kwargs.get('lr', 1e-3))
     coupling = COUPLING_DICT[method]
-    trainer = Trainer(model, loader, opt, n_epochs=kwargs.get('epochs', 200), sigma=kwargs.get('sigma', 0.005), sample_from_coupling=coupling)
+    trainer = Trainer(model, loader, opt, n_epochs=kwargs.get('epochs', 200), sigma=kwargs.get('sigma', 0.005), coupling=coupling)
     if record_history:
         model, history = trainer.train(from_random_gaussian=True, record_history=True)
         return model, history

@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 from .pipeline import FlowModelPipeline
-from ..modules.simple_flow import FlowModelBase
+from .simple_flow import FlowModelBase
 import ot
 
 class Trainer:
@@ -14,7 +14,7 @@ class Trainer:
                  optimizer: torch.optim.Optimizer,
                  n_epochs=100,
                  sigma=0.005,
-                 sample_from_coupling=None,
+                 coupling=None,
                  ):
         """
         Initialize the Trainer.
@@ -32,12 +32,10 @@ class Trainer:
         self.dataloader = dataloader
         self.n_epochs = n_epochs
         self.sigma = sigma
-        self.sample_from_coupling = sample_from_coupling
-        
-        # Initialize optimizer
+        self.coupling = coupling
         self.optimizer = optimizer
     
-    def train(self, from_random_gaussian=True):
+    def train(self, from_random_gaussian=False):
         """
         Train the flow model.
         
@@ -53,6 +51,11 @@ class Trainer:
         device = next(self.flow_model.parameters()).device
         for epoch in pbar:
             total_loss = 0.0
+
+            if hasattr(self.dataloader.dataset, "reshuffle"):
+                # print("Reshuffling dataset for new epoch...")
+                self.dataloader.dataset.reshuffle()
+
             for batch in self.dataloader:
                 if from_random_gaussian:
                     x_s = torch.randn_like(batch[0]).to(device)
@@ -61,8 +64,8 @@ class Trainer:
                     x_s = batch[0].to(device)
                     x_t = batch[1].to(device)
                 
-                if self.sample_from_coupling is not None:
-                    x_s, x_t = self.sample_from_coupling(x_s, x_t)
+                if self.coupling is not None:
+                    x_s, x_t = self.coupling(x_s, x_t)
 
                 batch_size_curr = x_s.size(0)
                 x_s = x_s.to(device)

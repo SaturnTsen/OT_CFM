@@ -103,6 +103,7 @@ class FlowModelPipeline:
                           alpha=0.3, s=5, title="Flow Sampling",
                           dataset_from=None, dataset_to=None,
                           source_color='blue', target_color='red',
+                          color='green',
                           save_path=None):
         """
         Generate an animation of the flow sampling process (for 2D data).
@@ -140,7 +141,7 @@ class FlowModelPipeline:
                        s=s-2, alpha=0.2, label='Target', color=target_color)
         
         scat = ax.scatter(x[:, 0].cpu().numpy(), x[:, 1].cpu().numpy(), 
-                         s=s, alpha=alpha)
+                         s=s, alpha=alpha, label='Flow Samples', color=color)
         
         ax.set_xlim(xlim)
         ax.set_ylim(ylim)
