@@ -4,7 +4,6 @@ from sklearn.datasets import make_blobs, make_circles, make_moons
 import math
 from typing import Literal
 
-
 def sample_toy(
     dataset_type: Literal['moons', 'circles', '6gaussians'],
     n_samples: int = 1000,

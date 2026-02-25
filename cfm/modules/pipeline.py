@@ -1,7 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter
-from IPython.display import HTML
+from IPython.core.display import HTML
 
 
 class FlowModelPipeline:
