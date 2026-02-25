@@ -43,17 +43,19 @@ def sinkhorn_coupling_minibatch(
     x1: Tensor,
     eps: float,
     num_samples: Optional[int] = None,
+    unbalanced: bool = True
 ) -> Tuple[Tensor, Tensor]:
     x0f, x1f = x0.reshape(x0.size(0), -1), x1.reshape(x1.size(0), -1)
 
     n, m = x0f.size(0), x1f.size(0)
     a = torch.full((n,), 1.0 / n, device=x0.device, dtype=torch.float32)
     b = torch.full((m,), 1.0 / m, device=x0.device, dtype=torch.float32)
+    C = ot.dist(x0, x1, metric='sqeuclidean', p=2, w=None, use_tensor=False)
 
-    C = torch.cdist(x0f, x1f, p=2).pow(2)
-    P = ot.sinkhorn(a, b, C, eps)
-    if not torch.is_tensor(P):
-        P = torch.as_tensor(P, device=x0.device, dtype=torch.float32)
+    if unbalanced:
+        P = ot.sinkhorn_unbalanced(a, b, C, eps, reg_m=1.0)
+    else:
+        P = ot.sinkhorn(a, b, C, eps)
 
     if num_samples is None:
         num_samples = n
@@ -177,6 +179,8 @@ class Trainer:
         path_cfg: PathConfig,
         n_epochs: int = 100,
         grad_clip_norm: Optional[float] = None,
+        save_path: Optional[int] = None,
+        save_period: int = 1
     ):
         self.flow_model = flow_model
         self.dataloader = dataloader
@@ -184,6 +188,8 @@ class Trainer:
         self.path = ProbabilityPath(path_cfg)
         self.n_epochs = n_epochs
         self.grad_clip_norm = grad_clip_norm
+        self.save_period = save_period
+        self.save_path = save_path
 
     def _unpack(self, batch: Any, device: torch.device) -> Tuple[Optional[Tensor], Tensor]:
         if isinstance(batch, (tuple, list)):
@@ -237,5 +243,8 @@ class Trainer:
 
             avg = total_loss / max(total_n, 1)
             pbar.set_description(f"Epoch [{epoch+1}/{self.n_epochs}] Path={self.path.cfg.name} Loss={avg:.6f}")
+
+            if epoch % self.save_period == 0:
+                torch.save(self.flow_model.state_dict(), self.save_path)
 
         return self.flow_model
