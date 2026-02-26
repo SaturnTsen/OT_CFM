@@ -155,8 +155,8 @@ class ProbabilityPath:
             mu = t * x1
             eps = torch.randn_like(mu)
 
-            sigma_t = t * float(self.cfg.fm_sigma) - t + 1.0
-            d_sigma_t = float(self.cfg.fm_sigma) - 1.0  # constant
+            sigma_t = t * float(self.cfg.sigma) - t + 1.0
+            d_sigma_t = float(self.cfg.sigma) - 1.0  # constant
             x_t = mu + sigma_t * eps
             u_t = x1 + d_sigma_t * eps
             return x_t, u_t
